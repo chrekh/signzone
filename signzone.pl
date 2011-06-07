@@ -160,7 +160,7 @@ sub readconfig {
 
     my $min  = 60;
     my $hour = 60 * $min;
-    my $day  = 60 * $hour;
+    my $day  = 24 * $hour;
     my $week = 7 * $day;
     
     our %config = (
