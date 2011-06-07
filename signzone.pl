@@ -9,10 +9,6 @@ use 5.010;
 # I = Inactive
 # D = Delete
 
-# key1 PA------RI-----D
-# key2 P-------A-----RI-----D
-# key3         P------A-----RI-----D
-
 my $min  = 60;
 my $hour = 60 * $min;
 my $day  = 60 * $hour;
@@ -21,11 +17,10 @@ my $week = 7 * $day;
 {    # main (kind of)
 
     our $zone = 'chrekh.se';
-    my $dbdir = '/tmp/named';
+    my $dbdir = '/var/bind';
     our $keydir = "$dbdir/keys";
     my $keyfile = "$dbdir/dnskey.db";
-    my %t = ( active => 5 * $week,
-              inactive => 6 * $week,
+    my %t = ( inactive => 6 * $week,
               delete => 15 * $week,
               prepublish => 2 * $week,
           );
@@ -43,10 +38,10 @@ my $week = 7 * $day;
         }
 
         # Delete keys that should be deleted
-        if ( $now > $key->{Delete} ) {
+        if ( exists $key->{Delete} && $now > $key->{Delete} ) {
             say "rm $key->{name}";
-            # unlink "$keydir/$key->{name}.key";
-            # unlink "$keydir/$key->{name}.private";
+            #unlink "$keydir/$key->{name}.key";
+            #unlink "$keydir/$key->{name}.private";
             next;
         }
         # Keys that should be published
@@ -69,9 +64,6 @@ my $week = 7 * $day;
                 &makekey($type,$now,$now,$now+$t{inactive},$now+$t{delete}); # p a i d
         }
 
-        # Sort active keys by inactivation date
-        @{$active{$type}} = sort { $a->{Inactive} <=> $b->{Inactive} } @{$active{$type}};
-
         # If there are no prepublished keys, and only one active key,
         # and its inactivation time is less than $prepublish away we
         # ned to make a new published key, that is to become active
@@ -89,6 +81,7 @@ my $week = 7 * $day;
     open( KEYFILE, '>', $keyfile ) || die "open $keyfile failed: $!";
     for my $type ( qw<ksk zsk> ) {
         for my $key ( @{$active{$type}}, @{$publish{$type}} ) {
+            say "use $key->{name} : $key->{type}";
             print KEYFILE '$include ', "$keydir/$key->{name}.key ; $key->{type}\n";
         }
     }
