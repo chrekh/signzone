@@ -2,31 +2,13 @@ use strict;
 use warnings;
 use 5.010;
 
-# C = Created
-# P = Publish
-# A = Activate
-# R = Revoke
-# I = Inactive
-# D = Delete
-
-my $min  = 60;
-my $hour = 60 * $min;
-my $day  = 60 * $hour;
-my $week = 7 * $day;
-
 {    # main (kind of)
 
-    our $zone = 'chrekh.se';
-    my $dbdir = '/var/bind';
-    our $keydir = "$dbdir/keys";
-    my $keyfile = "$dbdir/dnskey.db";
-    my %t = ( inactive => 6 * $week,
-              delete => 15 * $week,
-              prepublish => 2 * $week,
-          );
+    our %config;
+    &readconfig;
 
     my $now = time; # To avoid calling time several times, silly, I know. ;)
-    
+
     # Put keys in separate lists
     my %active = ( ksk => [], zsk => [] );
     my %publish = ( ksk => [], zsk => [] );
@@ -40,8 +22,8 @@ my $week = 7 * $day;
         # Delete keys that should be deleted
         if ( exists $key->{Delete} && $now > $key->{Delete} ) {
             say "rm $key->{name}";
-            #unlink "$keydir/$key->{name}.key";
-            #unlink "$keydir/$key->{name}.private";
+            #unlink "$config{keydir}/$key->{name}.key";
+            #unlink "$config{keydir}/$key->{name}.private";
             next;
         }
         # Keys that should be published
@@ -61,7 +43,7 @@ my $week = 7 * $day;
         # If we have no active keys, we must make one now.
         unless ( @{$active{$type}} ) {
             push @{$active{$type}},
-                &makekey($type,$now,$now,$now+$t{inactive},$now+$t{delete}); # p a i d
+                &makekey($type,$now,$now,$now+$config{inactive},$now+$config{delete}); # p a i d
         }
 
         # If there are no prepublished keys, and only one active key,
@@ -70,33 +52,31 @@ my $week = 7 * $day;
         # the same time the active key gets inactive.
         unless ( @{$publish{$type}} ) {
             my $t = $active{$type}->[0]->{Inactive};
-            if ( @{$active{$type}} == 1 && $t < $now + $t{prepublish} ) {
+            if ( @{$active{$type}} == 1 && $t < $now + $config{prepublish} ) {
                 push @{$publish{$type}},
-                    &makekey($type,$now,$t,$t+$t{inactive},$t+$t{delete}); # p a i d
+                    &makekey($type,$now,$t,$t+$config{inactive},$t+$config{delete}); # p a i d
             }
         }
     }
 
     # Write active and published keys to the keyfile to be included in the zone.
-    open( KEYFILE, '>', $keyfile ) || die "open $keyfile failed: $!";
+    open( KEYFILE, '>', $config{keyfile} ) || die "open $config{keyfile} failed: $!";
     for my $type ( qw<ksk zsk> ) {
         for my $key ( @{$active{$type}}, @{$publish{$type}} ) {
             say "use $key->{name} : $key->{type}";
-            print KEYFILE '$include ', "$keydir/$key->{name}.key ; $key->{type}\n";
+            print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
         }
     }
     close KEYFILE;
 }
 
 sub listkeys {
-    our $keydir;
-    our $zone;
-
+    our %config;
     my @result;
-    opendir( DIR, $keydir ) || die "opendir $keydir failed: $!";
+    opendir( DIR, $config{keydir} ) || die "opendir $config{keydir} failed: $!";
     while ( readdir(DIR) ) {
-        next unless ( -f "$keydir/$_" );
-        if ( my ($name) = /^(K$zone\.\+\d+\+\d+)\.key/ ) {
+        next unless ( -f "$config{keydir}/$_" );
+        if ( my ($name) = /^(K$config{zone}\.\+\d+\+\d+)\.key/ ) {
             my $key = { name => $name };
             &keyinfo($key);
             push(@result,$key);
@@ -108,10 +88,10 @@ sub listkeys {
 
 sub keyinfo {
     my $key = shift;
-    our $keydir;
+    our %config;
 
     # Get timing-info using dnssec-settime
-    my @cmd = ( 'dnssec-settime', '-up', 'all', "$keydir/$key->{name}" );
+    my @cmd = ( 'dnssec-settime', '-up', 'all', "$config{keydir}/$key->{name}" );
     open( CMD, '-|', @cmd ) || die "run @cmd failed: $!";
     while (<CMD>) {
         chomp;
@@ -124,7 +104,7 @@ sub keyinfo {
     die unless $? == 0;
 
     # Get more info by parsing the keyfile
-    open( FILE, '<', "$keydir/$key->{name}.key" ) || die "open $key->{name}.key failed: $!";
+    open( FILE, '<', "$config{keydir}/$key->{name}.key" ) || die "open $key->{name}.key failed: $!";
     while (<FILE>) {
         chomp;
         next if /^;/;    # skip comments
@@ -140,13 +120,10 @@ sub keyinfo {
 sub makekey {
     my $type = shift;
     my ( $p, $a, $i, $d ) = mktime(@_);
-    our $zone;
-    our $keydir;
-    my @cmd = ('dnssec-keygen', '-r', '/dev/urandom', '-b', '768', '-K', $keydir );
+    our %config;
+    my @cmd = ('dnssec-keygen', '-r', $config{randomdev}, '-b', $config{keysize}{$type}, '-K', $config{keydir} );
     push @cmd,'-f', 'KSK' if ($type eq 'ksk');
-    push @cmd,
-        '-n', 'ZONE', '-P', $p,
-        '-A', $a, '-I', $i, '-D', $d, "$zone.";
+    push @cmd, '-n', 'ZONE', '-P', $p, '-A', $a, '-I', $i, '-D', $d, "$config{zone}.";
     say "@cmd";
     my $key;
     open( CMD, '-|', @cmd ) || die "run @cmd failed: $!";
@@ -156,7 +133,7 @@ sub makekey {
     die unless $? == 0;
     chomp;
 
-    if ( my ($name) = /^(K$zone\.\+\d+\+\d+)$/ ) {
+    if ( my ($name) = /^(K$config{zone}\.\+\d+\+\d+)$/ ) {
         $key = { name => $name };
         &keyinfo($key);
     }
@@ -176,4 +153,25 @@ sub mktime {
             sprintf( "%04d%02d%02d%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec );
     }
     return @result;
+}
+
+sub readconfig {
+    # This will later read a real config-file
+
+    my $min  = 60;
+    my $hour = 60 * $min;
+    my $day  = 60 * $hour;
+    my $week = 7 * $day;
+    
+    our %config = (
+        zone => 'chrekh.se',
+        dbdir => '/var/bind',
+        randomdev => '/dev/random',
+        keysize => { ksk => 2048, zsk => 768 },
+        inactive => 6 * $week,
+        delete => 15 * $week,
+        prepublish => 2 * $week,
+    );
+    $config{keydir} = "$config{dbdir}/keys";
+    $config{keyfile} = "$config{dbdir}/dnskey.db";
 }
