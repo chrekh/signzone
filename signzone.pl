@@ -2,7 +2,14 @@ use strict;
 use warnings;
 use 5.010;
 
+use Getopt::Long;
+use Pod::Usage;
+
 {    # main (kind of)
+
+    Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
+    our %opts = ( c => '/etc/bind/signzone.conf' );
+    GetOptions(\%opts,'c=s') || pod2usage;
 
     our %config;
     &readconfig;
@@ -54,13 +61,14 @@ use 5.010;
             my $t = $active{$type}->[0]->{Inactive};
             if ( @{$active{$type}} == 1 && $t < $now + $config{prepublish} ) {
                 push @{$publish{$type}},
-                    &makekey($type,$now,$t,$t+$config{inactive},$t+$config{delete}); # p a i d
+                    &makekey($type,$now,$t,$t+$config{inactive},
+                             $t+$config{inactive}+$config{delete}); # p a i d
             }
         }
     }
 
-    # Write active and published keys to the keyfile to be included in the zone.
-    open( KEYFILE, '>', $config{keyfile} ) || die "open $config{keyfile} failed: $!";
+    # Write active and published keys to the keydb to be included in the zone.
+    open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
     for my $type ( qw<ksk zsk> ) {
         for my $key ( @{$active{$type}}, @{$publish{$type}} ) {
             say "use $key->{name} : $key->{type}";
@@ -103,7 +111,7 @@ sub keyinfo {
     close CMD;
     die unless $? == 0;
 
-    # Get more info by parsing the keyfile
+    # Get more info by parsing the keydb
     open( FILE, '<', "$config{keydir}/$key->{name}.key" ) || die "open $key->{name}.key failed: $!";
     while (<FILE>) {
         chomp;
@@ -156,22 +164,61 @@ sub mktime {
 }
 
 sub readconfig {
-    # This will later read a real config-file
+    our %opts;
+    open(FILE,'<',$opts{c}) || die "open $opts{c} failed: $!";
 
+    # Defaults ( and also valid configuration )
+    our %config = (
+        zone => 'foo.org',
+        zonefile => 'foo.org.db',
+        dbdir => '/var/named',
+        randomdev => '/dev/urandom',
+        keysize => { ksk => 2048, zsk => 768 },
+        inactive => '6w',
+        delete => '15w',
+        prepublish => '2w',
+        keydir => 'keys',
+        keydb => 'dnskey.db',
+    );
+
+    while (<FILE>) {
+        chomp;
+        next if ( /^\s*$/ );
+        next if ( /^#/ );
+
+        # single key
+        if ( my($key,$val) = /^\s*(\S+)\s*=\s*(\S+)/ ) {
+            die "Invalid config $key in $opts{d} line $.\n" unless ( exists $config{$key} );
+            $config{$key} = $val;
+            next;
+        }
+        # double key (currently only keysize)
+        if ( my($key,$type,$val) = /^\s*(\S+)\s+(\S+)\s*=\s*(\S+)/ ) {
+            die "Invalid config: $key $type in $opts{d} line $.\n" unless ( exists $config{$key}{$type} );
+            $config{$key}{$type} = $val;
+            next;
+        }
+        die "parse error in $opts{c} line $.\n";
+    }
+    close FILE;
+
+    # Prepend dbdir to relativa paths
+    for ( qw<keydir keydb> ) {
+        $config{$_} = "$config{dbdir}/$config{$_}" unless ( substr($config{$_},0,1) eq '/' );
+    }
+
+    # convert times to seconds
     my $min  = 60;
     my $hour = 60 * $min;
     my $day  = 24 * $hour;
     my $week = 7 * $day;
-    
-    our %config = (
-        zone => 'chrekh.se',
-        dbdir => '/var/bind',
-        randomdev => '/dev/random',
-        keysize => { ksk => 2048, zsk => 768 },
-        inactive => 6 * $week,
-        delete => 15 * $week,
-        prepublish => 2 * $week,
-    );
-    $config{keydir} = "$config{dbdir}/keys";
-    $config{keyfile} = "$config{dbdir}/dnskey.db";
+    my $mon  = 30 * $day;
+    my $year = 365 * $day;
+    for (qw<inactive delete prepublish> ) {
+        no warnings 'numeric';
+        $config{$_} = $config{$_} * $day  if ( substr($config{$_},-1,1) eq 'd' );
+        $config{$_} = $config{$_} * $week if ( substr($config{$_},-1,1) eq 'w' );
+        $config{$_} = $config{$_} * $mon  if ( substr($config{$_},-1,1) eq 'm' );
+        $config{$_} = $config{$_} * $year if ( substr($config{$_},-1,1) eq 'y' );
+    }
 }
