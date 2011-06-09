@@ -7,13 +7,15 @@ use Pod::Usage;
 
 Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
 our %opts = ( c => '/etc/bind/signzone.conf' );
-GetOptions( \%opts, 'c=s','s','n','r' ) || pod2usage;
+GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
 
 {    # main (kind of)
-
-
     our %config;
     &readconfig;
+    if ( exists $opts{printconf} ) {
+        &printconf;
+        exit;
+    }
 
     my $now = time;    # To avoid calling time several times, silly, I know. ;)
 
@@ -280,3 +282,18 @@ sub readconfig {
         }
     }
 }
+
+sub printconf {
+    our %config;
+    for my $key ( sort keys %config ) {
+        if ( ref($config{$key}) eq 'HASH') {
+            for my $type ( sort keys %{$config{$key}} ) {
+                say "$key $type = $config{$key}{$type}";
+            }
+        }
+        else {
+            say "$key = $config{$key}";
+        }
+    }
+}
+
