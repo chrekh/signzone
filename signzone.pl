@@ -69,9 +69,13 @@ use Pod::Usage;
 
     # Write active and published keys to the keydb to be included in the zone.
     open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
+    say "Key                     type published activated inactivate";
     for my $type ( qw<ksk zsk> ) {
         for my $key ( @{$active{$type}}, @{$publish{$type}} ) {
-            say "use $key->{name} : $key->{type}";
+            say "$key->{name} : $key->{type}  ",
+                &date($key->{Publish}),"  ",
+                &date($key->{Activate}),"  ",
+                &date($key->{Inactive});
             print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
         }
     }
@@ -161,6 +165,12 @@ sub mktime {
             sprintf( "%04d%02d%02d%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec );
     }
     return @result;
+}
+
+sub date {
+    my $t = shift;
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
+    return sprintf("%02d-%02d-%02d",$year%100,$mon+1,$mday);
 }
 
 sub readconfig {
