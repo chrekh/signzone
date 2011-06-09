@@ -69,12 +69,12 @@ use Pod::Usage;
 
     # Write active and published keys to the keydb to be included in the zone.
     open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
-    say "Key                     type published activated inactivate";
+    say "Key                     type publish  activate inactivate";
     for my $type ( qw<ksk zsk> ) {
         for my $key ( @{$active{$type}}, @{$publish{$type}} ) {
             say "$key->{name} : $key->{type}  ",
-                &date($key->{Publish}),"  ",
-                &date($key->{Activate}),"  ",
+                &date($key->{Publish})," ",
+                &date($key->{Activate})," ",
                 &date($key->{Inactive});
             print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
         }
