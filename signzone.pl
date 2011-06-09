@@ -9,18 +9,19 @@ use Pod::Usage;
 
     Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
     our %opts = ( c => '/etc/bind/signzone.conf' );
-    GetOptions(\%opts,'c=s') || pod2usage;
+    GetOptions( \%opts, 'c=s' ) || pod2usage;
 
     our %config;
     &readconfig;
 
-    my $now = time; # To avoid calling time several times, silly, I know. ;)
+    my $now = time;    # To avoid calling time several times, silly, I know. ;)
 
     # Put keys in separate lists
-    my %active = ( ksk => [], zsk => [] );
+    my %active  = ( ksk => [], zsk => [] );
     my %publish = ( ksk => [], zsk => [] );
-    for my $key ( &listkeys ) {
+    for my $key (&listkeys) {
         unless ( $key->{zk} ) {
+
             # Skip keys that are not zone-keys
             warn "$key->{name} is not a zone-key";
             next;
@@ -29,55 +30,64 @@ use Pod::Usage;
         # Delete keys that should be deleted
         if ( exists $key->{Delete} && $now > $key->{Delete} ) {
             say "rm $key->{name}";
+
             #unlink "$config{keydir}/$key->{name}.key";
             #unlink "$config{keydir}/$key->{name}.private";
             next;
         }
+
         # Keys that should be published
         if ( $now > $key->{Publish} ) {
+
             # Active keys
             if ( $now > $key->{Activate} && $now < $key->{Inactive} ) {
-                push(@{$active{$key->{type}}},$key);
+                push( @{ $active{ $key->{type} } }, $key );
             }
+
             # inactive keys
             else {
-                push(@{$publish{$key->{type}}},$key);
+                push( @{ $publish{ $key->{type} } }, $key );
             }
         }
     }
 
-    for my $type ( qw<ksk zsk> ) {
+    for my $type (qw<ksk zsk>) {
+
         # If we have no active keys, we must make one now.
-        unless ( @{$active{$type}} ) {
-            push @{$active{$type}},
-                &makekey($type,$now,$now,$now+$config{inactive},$now+$config{delete});
+        unless ( @{ $active{$type} } ) {
+            push @{ $active{$type} },
+                &makekey( $type, $now, $now, $now + $config{inactive}, $now + $config{delete} );
         }
 
         # Fint the key with the latest inactivation-time
-        my ($lastkey) = sort { $b->{Inactive} <=> $a->{Inactive} }
-            (@{$active{$type}},@{$publish{$type}});
+        my ($lastkey)
+            = sort { $b->{Inactive} <=> $a->{Inactive} }
+            ( @{ $active{$type} }, @{ $publish{$type} } );
 
         # Make a new published key if that keys inactivation-time is
         # less than prepublish-time away
         my $t = $lastkey->{Inactive};
         if ( $t < $now + $config{prepublish} ) {
-            push @{$publish{$type}},
-                &makekey($type,$now,$t,$t+$config{inactive},
-                         $t+$config{inactive}+$config{delete});
+            push @{ $publish{$type} },
+                &makekey(
+                $type, $now, $t,
+                $t + $config{inactive},
+                $t + $config{inactive} + $config{delete}
+                );
         }
     }
 
     # Write active and published keys to the keydb to be included in the zone.
     open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
     say "  Key                     type publish  activate inactivate";
-    for my $type ( qw<ksk zsk> ) {
-        for my $key ( sort {$a->{Activate} <=> $b->{Activate} }
-                          (@{$active{$type}},@{$publish{$type}}) ) {
+    for my $type (qw<ksk zsk>) {
+        for my $key ( sort { $a->{Activate} <=> $b->{Activate} }
+            ( @{ $active{$type} }, @{ $publish{$type} } ) ) {
             my $is_active = $now > $key->{Activate} && $now < $key->{Inactive} ? '* ' : '  ';
-            say $is_active,"$key->{name} : $key->{type}  ",
-                &date($key->{Publish})," ",
-                &date($key->{Activate})," ",
-                &date($key->{Inactive});
+            say $is_active, "$key->{name} : $key->{type}  ",
+                &date( $key->{Publish} ),  " ",
+                &date( $key->{Activate} ), " ",
+                &date( $key->{Inactive} );
             print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
         }
     }
@@ -93,7 +103,7 @@ sub listkeys {
         if ( my ($name) = /^(K$config{zone}\.\+\d+\+\d+)\.key/ ) {
             my $key = { name => $name };
             &keyinfo($key);
-            push(@result,$key);
+            push( @result, $key );
         }
     }
     closedir(DIR);
@@ -122,10 +132,11 @@ sub keyinfo {
     while (<FILE>) {
         chomp;
         next if /^;/;    # skip comments
-        if ( my ( $zone,$flags,$type,$algo ) = /^(\S+)\s+IN\s+DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s/ ) {
-            $key->{zk}     = ( $flags & 0400 ) == 0400;    # Bit 7  RFC4034
-            $key->{revoke} = ( $flags & 0200 ) == 0200;    # Bit 8  RFC5011
-            $key->{type}   = ( $flags & 01 ) == 01 ? 'ksk' : 'zsk';        # Bit 15 RFC4034/RFC3757
+        if ( my ( $zone, $flags, $type, $algo ) = /^(\S+)\s+IN\s+DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s/ )
+        {
+            $key->{zk}     = ( $flags & 0400 ) == 0400;                # Bit 7  RFC4034
+            $key->{revoke} = ( $flags & 0200 ) == 0200;                # Bit 8  RFC5011
+            $key->{type}   = ( $flags & 01 ) == 01 ? 'ksk' : 'zsk';    # Bit 15 RFC4034/RFC3757
         }
     }
     close FILE;
@@ -135,8 +146,11 @@ sub makekey {
     my $type = shift;
     my ( $p, $a, $i, $d ) = mktime(@_);
     our %config;
-    my @cmd = ('dnssec-keygen', '-r', $config{randomdev}, '-b', $config{keysize}{$type}, '-K', $config{keydir} );
-    push @cmd,'-f', 'KSK' if ($type eq 'ksk');
+    my @cmd = (
+        'dnssec-keygen', '-r', $config{randomdev}, '-b', $config{keysize}{$type},
+        '-K', $config{keydir}
+    );
+    push @cmd, '-f', 'KSK' if ( $type eq 'ksk' );
     push @cmd, '-n', 'ZONE', '-P', $p, '-A', $a, '-I', $i, '-D', $d, "$config{zone}.";
     say "@cmd";
     my $key;
@@ -171,42 +185,44 @@ sub mktime {
 
 sub date {
     my $t = shift;
-    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
-    return sprintf("%02d-%02d-%02d",$year%100,$mon+1,$mday);
+    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) = localtime($t);
+    return sprintf( "%02d-%02d-%02d", $year % 100, $mon + 1, $mday );
 }
 
 sub readconfig {
     our %opts;
-    open(FILE,'<',$opts{c}) || die "open $opts{c} failed: $!";
+    open( FILE, '<', $opts{c} ) || die "open $opts{c} failed: $!";
 
     # Defaults ( and also valid configuration )
     our %config = (
-        zone => 'foo.org',
-        zonefile => 'foo.org.db',
-        dbdir => '/var/named',
-        randomdev => '/dev/urandom',
-        keysize => { ksk => 2048, zsk => 768 },
-        inactive => '6w',
-        delete => '15w',
+        zone       => 'foo.org',
+        zonefile   => 'foo.org.db',
+        dbdir      => '/var/named',
+        randomdev  => '/dev/urandom',
+        keysize    => { ksk => 2048, zsk => 768 },
+        inactive   => '6w',
+        delete     => '15w',
         prepublish => '2w',
-        keydir => 'keys',
-        keydb => 'dnskey.db',
+        keydir     => 'keys',
+        keydb      => 'dnskey.db',
     );
 
     while (<FILE>) {
         chomp;
-        next if ( /^\s*$/ );
-        next if ( /^#/ );
+        next if (/^\s*$/);
+        next if (/^#/);
 
         # single key
-        if ( my($key,$val) = /^\s*(\S+)\s*=\s*(\S+)/ ) {
+        if ( my ( $key, $val ) = /^\s*(\S+)\s*=\s*(\S+)/ ) {
             die "Invalid config $key in $opts{d} line $.\n" unless ( exists $config{$key} );
             $config{$key} = $val;
             next;
         }
+
         # double key (currently only keysize)
-        if ( my($key,$type,$val) = /^\s*(\S+)\s+(\S+)\s*=\s*(\S+)/ ) {
-            die "Invalid config: $key $type in $opts{d} line $.\n" unless ( exists $config{$key}{$type} );
+        if ( my ( $key, $type, $val ) = /^\s*(\S+)\s+(\S+)\s*=\s*(\S+)/ ) {
+            die "Invalid config: $key $type in $opts{d} line $.\n"
+                unless ( exists $config{$key}{$type} );
             $config{$key}{$type} = $val;
             next;
         }
@@ -215,8 +231,8 @@ sub readconfig {
     close FILE;
 
     # Prepend dbdir to relativa paths
-    for ( qw<keydir keydb> ) {
-        $config{$_} = "$config{dbdir}/$config{$_}" unless ( substr($config{$_},0,1) eq '/' );
+    for (qw<keydir keydb>) {
+        $config{$_} = "$config{dbdir}/$config{$_}" unless ( substr( $config{$_}, 0, 1 ) eq '/' );
     }
 
     # convert times to seconds
@@ -226,11 +242,11 @@ sub readconfig {
     my $week = 7 * $day;
     my $mon  = 30 * $day;
     my $year = 365 * $day;
-    for (qw<inactive delete prepublish> ) {
+    for (qw<inactive delete prepublish>) {
         no warnings 'numeric';
-        $config{$_} = $config{$_} * $day  if ( substr($config{$_},-1,1) eq 'd' );
-        $config{$_} = $config{$_} * $week if ( substr($config{$_},-1,1) eq 'w' );
-        $config{$_} = $config{$_} * $mon  if ( substr($config{$_},-1,1) eq 'm' );
-        $config{$_} = $config{$_} * $year if ( substr($config{$_},-1,1) eq 'y' );
+        $config{$_} = $config{$_} * $day  if ( substr( $config{$_}, -1, 1 ) eq 'd' );
+        $config{$_} = $config{$_} * $week if ( substr( $config{$_}, -1, 1 ) eq 'w' );
+        $config{$_} = $config{$_} * $mon  if ( substr( $config{$_}, -1, 1 ) eq 'm' );
+        $config{$_} = $config{$_} * $year if ( substr( $config{$_}, -1, 1 ) eq 'y' );
     }
 }
