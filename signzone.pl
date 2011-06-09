@@ -53,17 +53,16 @@ use Pod::Usage;
                 &makekey($type,$now,$now,$now+$config{inactive},$now+$config{delete}); # p a i d
         }
 
-        # If there are no prepublished keys, and only one active key,
-        # and its inactivation time is less than $prepublish away we
-        # ned to make a new published key, that is to become active
-        # the same time the active key gets inactive.
-        unless ( @{$publish{$type}} ) {
-            my $t = $active{$type}->[0]->{Inactive};
-            if ( @{$active{$type}} == 1 && $t < $now + $config{prepublish} ) {
-                push @{$publish{$type}},
-                    &makekey($type,$now,$t,$t+$config{inactive},
-                             $t+$config{inactive}+$config{delete}); # p a i d
-            }
+        # Fint the key with the latest inactivation-time
+        my ($lastkey) = sort { $b->{Inactive} <=> $a->{Inactive} } (@{$active{$type}},@{$publish{$type}});
+
+        # Make a new published key if that keys inactivation-time is
+        # less than prepublish-time away
+        my $t = $lastkey->{Inactive};
+        if ( $t < $now + $config{prepublish} ) {
+            push @{$publish{$type}},
+                &makekey($type,$now,$t,$t+$config{inactive},
+                         $t+$config{inactive}+$config{delete}); # p a i d
         }
     }
 
@@ -71,7 +70,7 @@ use Pod::Usage;
     open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
     say "Key                     type publish  activate inactivate";
     for my $type ( qw<ksk zsk> ) {
-        for my $key ( @{$active{$type}}, @{$publish{$type}} ) {
+        for my $key ( sort {$a->{Activate} <=> $b->{Activate} } (@{$active{$type}},@{$publish{$type}}) ) {
             say "$key->{name} : $key->{type}  ",
                 &date($key->{Publish})," ",
                 &date($key->{Activate})," ",
