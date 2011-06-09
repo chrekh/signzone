@@ -5,11 +5,12 @@ use 5.010;
 use Getopt::Long;
 use Pod::Usage;
 
+Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
+our %opts = ( c => '/etc/bind/signzone.conf' );
+GetOptions( \%opts, 'c=s','s','n','r' ) || pod2usage;
+
 {    # main (kind of)
 
-    Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
-    our %opts = ( c => '/etc/bind/signzone.conf' );
-    GetOptions( \%opts, 'c=s' ) || pod2usage;
 
     our %config;
     &readconfig;
@@ -30,17 +31,18 @@ use Pod::Usage;
         # Delete keys that should be deleted
         if ( exists $key->{Delete} && $now > $key->{Delete} ) {
             say "rm $key->{name}";
-
-            #unlink "$config{keydir}/$key->{name}.key";
-            #unlink "$config{keydir}/$key->{name}.private";
+            unless ( exists $opts{n} ) {
+                unlink "$config{keydir}/$key->{name}.key";
+                unlink "$config{keydir}/$key->{name}.private";
+            }
             next;
         }
 
         # Keys that should be published
-        if ( $now > $key->{Publish} ) {
+        if ( $now >= $key->{Publish} ) {
 
             # Active keys
-            if ( $now > $key->{Activate} && $now < $key->{Inactive} ) {
+            if ( $now >= $key->{Activate} && $now < $key->{Inactive} ) {
                 push( @{ $active{ $key->{type} } }, $key );
             }
 
@@ -56,42 +58,50 @@ use Pod::Usage;
         # If we have no active keys, we must make one now.
         unless ( @{ $active{$type} } ) {
             push @{ $active{$type} },
-                &makekey( $type, $now, $now, $now + $config{inactive}, $now + $config{delete} );
+                &makekey( $type, $now, $now,
+                          $now + $config{inactive}{$type},
+                          $now + $config{delete}{$type} );
         }
 
-        # Fint the key with the latest inactivation-time
+        # Find the key with the latest inactivation-time
         my ($lastkey)
             = sort { $b->{Inactive} <=> $a->{Inactive} }
             ( @{ $active{$type} }, @{ $publish{$type} } );
 
-        # Make a new published key if that keys inactivation-time is
-        # less than prepublish-time away
+        # Make a new published key if that $lastkeys inactivation-time
+        # is less than prepublish-time away
         my $t = $lastkey->{Inactive};
-        if ( $t < $now + $config{prepublish} ) {
+        if ( $t < $now + $config{prepublish}{$type} ) {
             push @{ $publish{$type} },
                 &makekey(
                 $type, $now, $t,
-                $t + $config{inactive},
-                $t + $config{inactive} + $config{delete}
+                $t + $config{inactive}{$type},
+                $t + $config{inactive}{$type} + $config{delete}{$type}
                 );
         }
     }
 
     # Write active and published keys to the keydb to be included in the zone.
-    open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
-    say "  Key                     type publish  activate inactivate";
+    unless ( exists $opts{n} ) {
+        open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
+    }
+    say "  Key                           type publish  activate inactivate";
     for my $type (qw<ksk zsk>) {
         for my $key ( sort { $a->{Activate} <=> $b->{Activate} }
             ( @{ $active{$type} }, @{ $publish{$type} } ) ) {
-            my $is_active = $now > $key->{Activate} && $now < $key->{Inactive} ? '* ' : '  ';
-            say $is_active, "$key->{name} : $key->{type}  ",
-                &date( $key->{Publish} ),  " ",
-                &date( $key->{Activate} ), " ",
-                &date( $key->{Inactive} );
-            print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
+            my $is_active = $now >= $key->{Activate} && $now <= $key->{Inactive} ? '* ' : '  ';
+            printf("%s%-30s %s %s %s %s\n",
+                   $is_active,$key->{name},$key->{type},
+                   &date( $key->{Publish} ),
+                   &date( $key->{Activate} ),
+                   &date( $key->{Inactive} ),
+               );
+            unless ( exists $opts{n} ) {
+                print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
+            }
         }
     }
-    close KEYFILE;
+    close KEYFILE unless ( exists $opts{n} );
 }
 
 sub listkeys {
@@ -143,16 +153,30 @@ sub keyinfo {
 }
 
 sub makekey {
-    my $type = shift;
-    my ( $p, $a, $i, $d ) = mktime(@_);
+    my ( $type, $p, $a, $i, $d ) = @_;
     our %config;
     my @cmd = (
         'dnssec-keygen', '-r', $config{randomdev}, '-b', $config{keysize}{$type},
         '-K', $config{keydir}
     );
     push @cmd, '-f', 'KSK' if ( $type eq 'ksk' );
-    push @cmd, '-n', 'ZONE', '-P', $p, '-A', $a, '-I', $i, '-D', $d, "$config{zone}.";
+    push @cmd, '-n', 'ZONE', '-P', &mktime($p), '-A', &mktime($a),
+               '-I', &mktime($i), '-D', &mktime($d), "$config{zone}.";
     say "@cmd";
+    if ( exists $opts{n} ) {
+        # return a fake key
+        return {
+            name     => "K$config{zone}+005+99999",
+            Created  => time,
+            Publish  => $p,
+            Activate => $a,
+            Inactive => $i,
+            Delete   => $d,
+            zk       => 1,
+            revoke   => '',
+            type     => $type,
+        };
+    }
     my $key;
     open( CMD, '-|', @cmd ) || die "run @cmd failed: $!";
     $_ = <CMD>;
@@ -191,22 +215,24 @@ sub date {
 
 sub readconfig {
     our %opts;
-    open( FILE, '<', $opts{c} ) || die "open $opts{c} failed: $!";
-
     # Defaults ( and also valid configuration )
     our %config = (
         zone       => 'foo.org',
         zonefile   => 'foo.org.db',
         dbdir      => '/var/named',
         randomdev  => '/dev/urandom',
-        keysize    => { ksk => 2048, zsk => 768 },
-        inactive   => '6w',
-        delete     => '15w',
-        prepublish => '2w',
+        keysize    => { ksk => 2048,  zsk => 768 },
+        inactive   => { ksk => '1y',  zsk => '5w' },
+        delete     => { ksk => '10w', zsk => '10w' },
+        prepublish => { ksk => '3w', zsk => '5w' },
         keydir     => 'keys',
         keydb      => 'dnskey.db',
     );
-
+    
+    unless ( open( FILE, '<', $opts{c} ) ) {
+        warn "open $opts{c} failed: $!";
+        goto NOFILE;
+    }
     while (<FILE>) {
         chomp;
         next if (/^\s*$/);
@@ -214,14 +240,15 @@ sub readconfig {
 
         # single key
         if ( my ( $key, $val ) = /^\s*(\S+)\s*=\s*(\S+)/ ) {
-            die "Invalid config $key in $opts{d} line $.\n" unless ( exists $config{$key} );
+            die "Invalid config $key in $opts{c} line $.\n" unless ( exists $config{$key} );
+            die "Missing type (ksk|zsk) in $opts{c} line $.\n" if ( ref($config{$key}) eq 'HASH' );
             $config{$key} = $val;
             next;
         }
 
-        # double key (currently only keysize)
+        # double key
         if ( my ( $key, $type, $val ) = /^\s*(\S+)\s+(\S+)\s*=\s*(\S+)/ ) {
-            die "Invalid config: $key $type in $opts{d} line $.\n"
+            die "Invalid config: $key $type in $opts{c} line $.\n"
                 unless ( exists $config{$key}{$type} );
             $config{$key}{$type} = $val;
             next;
@@ -230,6 +257,7 @@ sub readconfig {
     }
     close FILE;
 
+  NOFILE:
     # Prepend dbdir to relativa paths
     for (qw<keydir keydb>) {
         $config{$_} = "$config{dbdir}/$config{$_}" unless ( substr( $config{$_}, 0, 1 ) eq '/' );
@@ -242,11 +270,13 @@ sub readconfig {
     my $week = 7 * $day;
     my $mon  = 30 * $day;
     my $year = 365 * $day;
-    for (qw<inactive delete prepublish>) {
-        no warnings 'numeric';
-        $config{$_} = $config{$_} * $day  if ( substr( $config{$_}, -1, 1 ) eq 'd' );
-        $config{$_} = $config{$_} * $week if ( substr( $config{$_}, -1, 1 ) eq 'w' );
-        $config{$_} = $config{$_} * $mon  if ( substr( $config{$_}, -1, 1 ) eq 'm' );
-        $config{$_} = $config{$_} * $year if ( substr( $config{$_}, -1, 1 ) eq 'y' );
+    for my $type ( qw<ksk zsk> ) {
+        for (qw<inactive delete prepublish>) {
+            no warnings 'numeric';
+            $config{$_}{$type} = $config{$_}{$type} * $day  if ( substr( $config{$_}{$type}, -1, 1 ) eq 'd' );
+            $config{$_}{$type} = $config{$_}{$type} * $week if ( substr( $config{$_}{$type}, -1, 1 ) eq 'w' );
+            $config{$_}{$type} = $config{$_}{$type} * $mon  if ( substr( $config{$_}{$type}, -1, 1 ) eq 'm' );
+            $config{$_}{$type} = $config{$_}{$type} * $year if ( substr( $config{$_}{$type}, -1, 1 ) eq 'y' );
+        }
     }
 }
