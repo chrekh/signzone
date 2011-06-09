@@ -50,11 +50,12 @@ use Pod::Usage;
         # If we have no active keys, we must make one now.
         unless ( @{$active{$type}} ) {
             push @{$active{$type}},
-                &makekey($type,$now,$now,$now+$config{inactive},$now+$config{delete}); # p a i d
+                &makekey($type,$now,$now,$now+$config{inactive},$now+$config{delete});
         }
 
         # Fint the key with the latest inactivation-time
-        my ($lastkey) = sort { $b->{Inactive} <=> $a->{Inactive} } (@{$active{$type}},@{$publish{$type}});
+        my ($lastkey) = sort { $b->{Inactive} <=> $a->{Inactive} }
+            (@{$active{$type}},@{$publish{$type}});
 
         # Make a new published key if that keys inactivation-time is
         # less than prepublish-time away
@@ -62,16 +63,18 @@ use Pod::Usage;
         if ( $t < $now + $config{prepublish} ) {
             push @{$publish{$type}},
                 &makekey($type,$now,$t,$t+$config{inactive},
-                         $t+$config{inactive}+$config{delete}); # p a i d
+                         $t+$config{inactive}+$config{delete});
         }
     }
 
     # Write active and published keys to the keydb to be included in the zone.
     open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
-    say "Key                     type publish  activate inactivate";
+    say "  Key                     type publish  activate inactivate";
     for my $type ( qw<ksk zsk> ) {
-        for my $key ( sort {$a->{Activate} <=> $b->{Activate} } (@{$active{$type}},@{$publish{$type}}) ) {
-            say "$key->{name} : $key->{type}  ",
+        for my $key ( sort {$a->{Activate} <=> $b->{Activate} }
+                          (@{$active{$type}},@{$publish{$type}}) ) {
+            my $is_active = $now > $key->{Activate} && $now < $key->{Inactive} ? '* ' : '  ';
+            say $is_active,"$key->{name} : $key->{type}  ",
                 &date($key->{Publish})," ",
                 &date($key->{Activate})," ",
                 &date($key->{Inactive});
