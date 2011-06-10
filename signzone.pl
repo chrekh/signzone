@@ -285,40 +285,40 @@ sub readconfig {
         prepublish => { ksk => '3w', zsk => '5w' },
         keydir     => 'keys',
         keydb      => 'dnskey.db',
-        view       => q<>,
+        view       => '',
         serialfmt  => 'keep',
     );
 
-    unless ( open( FILE, '<', $opts{c} ) ) {
+    if ( open( FILE, '<', $opts{c} ) ) {
+        while (<FILE>) {
+            chomp;
+            next if (/^\s*$/);
+            next if (/^#/);
+
+            # single key
+            if ( my ( $key, $val ) = /^\s*(\S+)\s*=\s*(\S+)/ ) {
+                die "Invalid config $key in $opts{c} line $.\n" unless ( exists $config{$key} );
+                die "Missing type (ksk|zsk) in $opts{c} line $.\n"
+                    if ( ref( $config{$key} ) eq 'HASH' );
+                $config{$key} = $val;
+                next;
+            }
+
+            # double key
+            if ( my ( $key, $type, $val ) = /^\s*(\S+)\s+(\S+)\s*=\s*(\S+)/ ) {
+                die "Invalid config: $key $type in $opts{c} line $.\n"
+                    unless ( exists $config{$key}{$type} );
+                $config{$key}{$type} = $val;
+                next;
+            }
+            die "parse error in $opts{c} line $.\n";
+        }
+        close FILE;
+    }
+    else {
         warn "open $opts{c} failed: $!";
-        goto NOFILE;
+        warn "*** using default configuration ***\n";
     }
-    while (<FILE>) {
-        chomp;
-        next if (/^\s*$/);
-        next if (/^#/);
-
-        # single key
-        if ( my ( $key, $val ) = /^\s*(\S+)\s*=\s*(\S+)/ ) {
-            die "Invalid config $key in $opts{c} line $.\n" unless ( exists $config{$key} );
-            die "Missing type (ksk|zsk) in $opts{c} line $.\n"
-                if ( ref( $config{$key} ) eq 'HASH' );
-            $config{$key} = $val;
-            next;
-        }
-
-        # double key
-        if ( my ( $key, $type, $val ) = /^\s*(\S+)\s+(\S+)\s*=\s*(\S+)/ ) {
-            die "Invalid config: $key $type in $opts{c} line $.\n"
-                unless ( exists $config{$key}{$type} );
-            $config{$key}{$type} = $val;
-            next;
-        }
-        die "parse error in $opts{c} line $.\n";
-    }
-    close FILE;
-
-NOFILE:
 
     # Prepend dbdir to relative paths
     for (qw<keydir keydb zonefile>) {
