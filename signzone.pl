@@ -4,6 +4,7 @@ use 5.010;
 
 use Getopt::Long;
 use Pod::Usage;
+use File::Copy;
 
 Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
 our %opts = ( c => '/etc/bind/signzone.conf' );
@@ -135,8 +136,9 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
     close KEYFILE if ( ! exists $opts{n} && $newkeydb );
 
     if ( $newkeydb && exists $opts{s} ) {
+        &increment_serial unless ( exists $opts{n} );
         my @cmd = ('dnssec-signzone', '-S', '-K', $config{keydir},
-                   '-o', $config{zone}, '-N', $config{serialfmt} );
+                   '-o', $config{zone});
         push @cmd, $config{zonefile};
         say "@cmd";
         unless ( exists $opts{n} ) {
@@ -349,3 +351,33 @@ sub printconf {
     }
 }
 
+sub increment_serial {
+    our %config;
+
+    open(F,'<',$config{zonefile}) || die "open $config{zonefile} failed: $!";
+    my @zone = <F>;
+    close F;
+
+    my $changed = 0;
+    for ( @zone ) {
+        if ( $config{serialfmt} eq 'increment' ) {
+            if ( s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,$2+1)/e ) {
+                $changed = 1;
+                last;
+            }
+        }
+        elsif ( $config{serialfmt} eq 'unixtime' ) {
+            if ( s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,time)/e ) {
+                $changed = 1;
+                last;
+            }
+        }
+    }
+    return unless $changed;
+
+    open(F,'>',$config{zonefile}) || die "open $config{zonefile} failed: $!";
+
+    print F @zone;
+
+    close F;
+}
