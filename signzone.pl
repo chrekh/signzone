@@ -8,7 +8,7 @@ use File::Copy;
 
 Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
 our %opts = ( c => '/etc/bind/signzone.conf' );
-GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
+GetOptions( \%opts, 'c=s', 's', 'n', 'r', 'printconf' ) || pod2usage;
 
 {    # main (kind of)
     our %config;
@@ -57,19 +57,21 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
     }
 
     for my $type (qw<ksk zsk>) {
-        
+
         # If we have no active keys, we must make one now.
         unless ( @{ $active{$type} } ) {
             push @{ $active{$type} },
-                &makekey( $type, $now, $now,
-                          $now + $config{inactive}{$type},
-                          $now + $config{delete}{$type} );
+                &makekey(
+                    $type, $now, $now,
+                    $now + $config{inactive}{$type},
+                    $now + $config{delete}{$type}
+                );
         }
 
         # Find the key with the latest inactivation-time
         my ($lastkey)
             = sort { $b->{Inactive} <=> $a->{Inactive} }
-            ( @{ $active{$type} }, @{ $publish{$type} } );
+                ( @{ $active{$type} }, @{ $publish{$type} } );
 
         # Make a new published key if that $lastkeys inactivation-time
         # is less than prepublish-time away
@@ -77,9 +79,9 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
         if ( $t < $now + $config{prepublish}{$type} ) {
             push @{ $publish{$type} },
                 &makekey(
-                $type, $now, $t,
-                $t + $config{inactive}{$type},
-                $t + $config{inactive}{$type} + $config{delete}{$type}
+                    $type, $now, $t,
+                    $t + $config{inactive}{$type},
+                    $t + $config{inactive}{$type} + $config{delete}{$type}
                 );
         }
     }
@@ -89,7 +91,7 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
     my $newkeydb = 0;
     if ( open( KEYFILE, '<', $config{keydb} ) ) {
         my %keys;
-        while ( <KEYFILE> ) {
+        while (<KEYFILE>) {
             chomp;
             if ( my ($keyname) = /include.+(K$config{zone}\.+\S+)\.key/ ) {
                 $keys{$keyname} = 1;
@@ -97,10 +99,10 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
             }
         }
         close KEYFILE;
-        for my $type ( qw<ksk zsk> ) {
+        for my $type (qw<ksk zsk>) {
             for ( @{ $active{$type} }, @{ $publish{$type} } ) {
-                if ( exists $keys{$_->{name}} ) {
-                    delete $keys{$_->{name}};
+                if ( exists $keys{ $_->{name} } ) {
+                    delete $keys{ $_->{name} };
                 }
                 else {
                     $newkeydb = 1;
@@ -113,8 +115,9 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
     else {
         $newkeydb = 1;
     }
+
     # Write active and published keys to the keydb to be included in the zone.
-    if ( ! exists $opts{n} && $newkeydb ) {
+    if ( !exists $opts{n} && $newkeydb ) {
         open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
     }
     say "  Key                           type publish  activate inactivate";
@@ -123,22 +126,21 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
             ( @{ $active{$type} }, @{ $publish{$type} } ) ) {
             my $is_active = $now >= $key->{Activate} && $now <= $key->{Inactive} ? '* ' : '  ';
             printf("%s%-30s %s %s %s %s\n",
-                   $is_active,$key->{name},$key->{type},
+                   $is_active, $key->{name}, $key->{type},
                    &date( $key->{Publish} ),
                    &date( $key->{Activate} ),
                    &date( $key->{Inactive} ),
                );
-            if ( ! exists $opts{n} && $newkeydb ) {
+            if ( !exists $opts{n} && $newkeydb ) {
                 print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
             }
         }
     }
-    close KEYFILE if ( ! exists $opts{n} && $newkeydb );
+    close KEYFILE if ( !exists $opts{n} && $newkeydb );
 
     if ( $newkeydb && exists $opts{s} ) {
         &increment_serial unless ( exists $opts{n} );
-        my @cmd = ('dnssec-signzone', '-S', '-K', $config{keydir},
-                   '-o', $config{zone});
+        my @cmd = ( 'dnssec-signzone', '-S', '-K', $config{keydir}, '-o', $config{zone} );
         push @cmd, $config{zonefile};
         say "@cmd";
         unless ( exists $opts{n} ) {
@@ -147,8 +149,8 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
         }
 
         if ( exists $opts{r} ) {
-            my @cmd = ( 'rndc', 'reload', $config{zone}, 'in');
-            push(@cmd, $config{view}) if ( $config{view} ne q<> );
+            my @cmd = ( 'rndc', 'reload', $config{zone}, 'in' );
+            push( @cmd, $config{view} ) if ( $config{view} ne q<> );
             say "@cmd";
             unless ( exists $opts{n} ) {
                 system @cmd;
@@ -215,9 +217,10 @@ sub makekey {
     );
     push @cmd, '-f', 'KSK' if ( $type eq 'ksk' );
     push @cmd, '-n', 'ZONE', '-P', &mktime($p), '-A', &mktime($a),
-               '-I', &mktime($i), '-D', &mktime($d), "$config{zone}.";
+        '-I', &mktime($i), '-D', &mktime($d), "$config{zone}.";
     say "@cmd";
     if ( exists $opts{n} ) {
+
         # return a fake key
         return {
             name     => "K$config{zone}+005+99999",
@@ -269,14 +272,15 @@ sub date {
 
 sub readconfig {
     our %opts;
+
     # Defaults ( and also valid configuration )
     our %config = (
         zone       => 'foo.org',
         zonefile   => 'foo.org.db',
         dbdir      => '/var/named',
         randomdev  => '/dev/urandom',
-        keysize    => { ksk => 2048,  zsk => 768 },
-        inactive   => { ksk => '1y',  zsk => '5w' },
+        keysize    => { ksk => 2048, zsk => 768 },
+        inactive   => { ksk => '1y', zsk => '5w' },
         delete     => { ksk => '10w', zsk => '10w' },
         prepublish => { ksk => '3w', zsk => '5w' },
         keydir     => 'keys',
@@ -284,7 +288,7 @@ sub readconfig {
         view       => q<>,
         serialfmt  => 'keep',
     );
-    
+
     unless ( open( FILE, '<', $opts{c} ) ) {
         warn "open $opts{c} failed: $!";
         goto NOFILE;
@@ -297,7 +301,8 @@ sub readconfig {
         # single key
         if ( my ( $key, $val ) = /^\s*(\S+)\s*=\s*(\S+)/ ) {
             die "Invalid config $key in $opts{c} line $.\n" unless ( exists $config{$key} );
-            die "Missing type (ksk|zsk) in $opts{c} line $.\n" if ( ref($config{$key}) eq 'HASH' );
+            die "Missing type (ksk|zsk) in $opts{c} line $.\n"
+                if ( ref( $config{$key} ) eq 'HASH' );
             $config{$key} = $val;
             next;
         }
@@ -313,7 +318,8 @@ sub readconfig {
     }
     close FILE;
 
-  NOFILE:
+NOFILE:
+
     # Prepend dbdir to relative paths
     for (qw<keydir keydb zonefile>) {
         $config{$_} = "$config{dbdir}/$config{$_}" unless ( substr( $config{$_}, 0, 1 ) eq '/' );
@@ -326,13 +332,17 @@ sub readconfig {
     my $week = 7 * $day;
     my $mon  = 30 * $day;
     my $year = 365 * $day;
-    for my $type ( qw<ksk zsk> ) {
+    for my $type (qw<ksk zsk>) {
         for (qw<inactive delete prepublish>) {
             no warnings 'numeric';
-            $config{$_}{$type} = $config{$_}{$type} * $day  if ( substr( $config{$_}{$type}, -1, 1 ) eq 'd' );
-            $config{$_}{$type} = $config{$_}{$type} * $week if ( substr( $config{$_}{$type}, -1, 1 ) eq 'w' );
-            $config{$_}{$type} = $config{$_}{$type} * $mon  if ( substr( $config{$_}{$type}, -1, 1 ) eq 'm' );
-            $config{$_}{$type} = $config{$_}{$type} * $year if ( substr( $config{$_}{$type}, -1, 1 ) eq 'y' );
+            $config{$_}{$type} = $config{$_}{$type} * $day
+                if ( substr( $config{$_}{$type}, -1, 1 ) eq 'd' );
+            $config{$_}{$type} = $config{$_}{$type} * $week
+                if ( substr( $config{$_}{$type}, -1, 1 ) eq 'w' );
+            $config{$_}{$type} = $config{$_}{$type} * $mon
+                if ( substr( $config{$_}{$type}, -1, 1 ) eq 'm' );
+            $config{$_}{$type} = $config{$_}{$type} * $year
+                if ( substr( $config{$_}{$type}, -1, 1 ) eq 'y' );
         }
     }
 }
@@ -340,8 +350,8 @@ sub readconfig {
 sub printconf {
     our %config;
     for my $key ( sort keys %config ) {
-        if ( ref($config{$key}) eq 'HASH') {
-            for my $type ( sort keys %{$config{$key}} ) {
+        if ( ref( $config{$key} ) eq 'HASH' ) {
+            for my $type ( sort keys %{ $config{$key} } ) {
                 say "$key $type = $config{$key}{$type}";
             }
         }
@@ -354,20 +364,20 @@ sub printconf {
 sub increment_serial {
     our %config;
 
-    open(F,'<',$config{zonefile}) || die "open $config{zonefile} failed: $!";
+    open( F, '<', $config{zonefile} ) || die "open $config{zonefile} failed: $!";
     my @zone = <F>;
     close F;
 
     my $changed = 0;
-    for ( @zone ) {
+    for (@zone) {
         if ( $config{serialfmt} eq 'increment' ) {
-            if ( s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,$2+1)/e ) {
+            if (s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,$2+1)/e) {
                 $changed = 1;
                 last;
             }
         }
         elsif ( $config{serialfmt} eq 'unixtime' ) {
-            if ( s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,time)/e ) {
+            if (s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,time)/e) {
                 $changed = 1;
                 last;
             }
@@ -375,7 +385,7 @@ sub increment_serial {
     }
     return unless $changed;
 
-    open(F,'>',$config{zonefile}) || die "open $config{zonefile} failed: $!";
+    open( F, '>', $config{zonefile} ) || die "open $config{zonefile} failed: $!";
 
     print F @zone;
 
