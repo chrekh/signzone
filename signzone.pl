@@ -223,7 +223,7 @@ sub makekey {
 
         # return a fake key
         return {
-            name     => "K$config{zone}+005+99999",
+            name     => "K$config{zone}.+005+99999",
             Created  => time,
             Publish  => $p,
             Activate => $a,
