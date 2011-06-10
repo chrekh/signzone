@@ -6,6 +6,9 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Copy;
 
+# Hardcoded path
+$ENV{PATH} = '/usr/sbin:/usr/bin';
+
 Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
 our %opts = ( c => '/etc/bind/signzone.conf' );
 GetOptions( \%opts, 'c=s', 's', 'n', 'r', 'printconf' ) || pod2usage;
@@ -182,7 +185,7 @@ sub keyinfo {
 
     # Get timing-info using dnssec-settime
     my @cmd = ( 'dnssec-settime', '-up', 'all', "$config{keydir}/$key->{name}" );
-    open( CMD, '-|', @cmd ) || die "run @cmd failed: $!";
+    open( CMD, '-|', @cmd ) || die;
     while (<CMD>) {
         chomp;
         if ( my ( $type, $val ) = /^(\w+):\s+(\d+)$/ ) {
@@ -235,7 +238,7 @@ sub makekey {
         };
     }
     my $key;
-    open( CMD, '-|', @cmd ) || die "run @cmd failed: $!";
+    open( CMD, '-|', @cmd ) || die;
     $_ = <CMD>;
     say;
     close(CMD);
