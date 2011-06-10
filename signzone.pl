@@ -363,6 +363,7 @@ sub printconf {
 
 sub increment_serial {
     our %config;
+    return if ( $config{serialfmt} eq 'keep' );
 
     open( F, '<', $config{zonefile} ) || die "open $config{zonefile} failed: $!";
     my @zone = <F>;
