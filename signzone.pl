@@ -56,7 +56,7 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
     }
 
     for my $type (qw<ksk zsk>) {
-
+        
         # If we have no active keys, we must make one now.
         unless ( @{ $active{$type} } ) {
             push @{ $active{$type} },
@@ -83,8 +83,37 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
         }
     }
 
+    # Compare present keydb with keylist, to be able to tell if we
+    # should write a new keydb
+    my $newkeydb = 0;
+    if ( open( KEYFILE, '<', $config{keydb} ) ) {
+        my %keys;
+        while ( <KEYFILE> ) {
+            chomp;
+            if ( my ($keyname) = /include.+(K$config{zone}\.+\S+)\.key/ ) {
+                $keys{$keyname} = 1;
+                next;
+            }
+        }
+        close KEYFILE;
+        for my $type ( qw<ksk zsk> ) {
+            for ( @{ $active{$type} }, @{ $publish{$type} } ) {
+                if ( exists $keys{$_->{name}} ) {
+                    delete $keys{$_->{name}};
+                }
+                else {
+                    $newkeydb = 1;
+                    last;
+                }
+            }
+        }
+        $newkeydb = 1 unless ( keys %keys == 0 );
+    }
+    else {
+        $newkeydb = 1;
+    }
     # Write active and published keys to the keydb to be included in the zone.
-    unless ( exists $opts{n} ) {
+    if ( ! exists $opts{n} && $newkeydb ) {
         open( KEYFILE, '>', $config{keydb} ) || die "open $config{keydb} failed: $!";
     }
     say "  Key                           type publish  activate inactivate";
@@ -98,12 +127,33 @@ GetOptions( \%opts, 'c=s','s','n','r','printconf' ) || pod2usage;
                    &date( $key->{Activate} ),
                    &date( $key->{Inactive} ),
                );
-            unless ( exists $opts{n} ) {
+            if ( ! exists $opts{n} && $newkeydb ) {
                 print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
             }
         }
     }
-    close KEYFILE unless ( exists $opts{n} );
+    close KEYFILE if ( ! exists $opts{n} && $newkeydb );
+
+    if ( $newkeydb && exists $opts{s} ) {
+        my @cmd = ('dnssec-signzone', '-S', '-K', $config{keydir},
+                   '-o', $config{zone}, '-N', $config{serialfmt} );
+        push @cmd, $config{zonefile};
+        say "@cmd";
+        unless ( exists $opts{n} ) {
+            system @cmd;
+            die unless $? == 0;
+        }
+
+        if ( exists $opts{r} ) {
+            my @cmd = ( 'rndc', 'reload', $config{zone}, 'in');
+            push(@cmd, $config{view}) if ( $config{view} ne q<> );
+            say "@cmd";
+            unless ( exists $opts{n} ) {
+                system @cmd;
+                die unless $? == 0;
+            }
+        }
+    }
 }
 
 sub listkeys {
@@ -229,6 +279,8 @@ sub readconfig {
         prepublish => { ksk => '3w', zsk => '5w' },
         keydir     => 'keys',
         keydb      => 'dnskey.db',
+        view       => q<>,
+        serialfmt  => 'keep',
     );
     
     unless ( open( FILE, '<', $opts{c} ) ) {
@@ -260,8 +312,8 @@ sub readconfig {
     close FILE;
 
   NOFILE:
-    # Prepend dbdir to relativa paths
-    for (qw<keydir keydb>) {
+    # Prepend dbdir to relative paths
+    for (qw<keydir keydb zonefile>) {
         $config{$_} = "$config{dbdir}/$config{$_}" unless ( substr( $config{$_}, 0, 1 ) eq '/' );
     }
 
