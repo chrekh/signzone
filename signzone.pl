@@ -275,16 +275,15 @@ sub readconfig {
         zone       => 'foo.org',
         dbdir      => '/var/named',
         randomdev  => '/dev/urandom',
-        keysize    => { ksk => 2048, zsk => 768 },
-        inactive   => { ksk => '1y', zsk => '5w' },
+        keysize    => { ksk => 2048,  zsk => 768 },
+        inactive   => { ksk => '1y',  zsk => '5w' },
         delete     => { ksk => '10w', zsk => '10w' },
-        prepublish => { ksk => '5w', zsk => '5w' },
+        prepublish => { ksk => '5w',  zsk => '5w' },
         keydir     => 'keys',
         keydb      => 'dnskey.db',
         view       => '',
         serialfmt  => 'keep',
     );
-    $config{zonefile} = "$config{zone}.db";
 
     if ( open( CONFIG, '<', $opts{c} ) ) {
         while (<CONFIG>) {
@@ -316,6 +315,7 @@ sub readconfig {
         warn "open $opts{c} failed: $!";
         warn "*** using default configuration ***\n";
     }
+    $config{zonefile} = "$config{zone}.db" unless ( exists $config{zonefile} );
 
     # Prepend dbdir to relative paths
     for (qw<keydir keydb zonefile>) {
