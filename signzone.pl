@@ -279,18 +279,18 @@ sub readconfig {
     # Defaults ( and also valid configuration )
     our %config = (
         zone       => 'foo.org',
-        zonefile   => 'foo.org.db',
         dbdir      => '/var/named',
         randomdev  => '/dev/urandom',
         keysize    => { ksk => 2048, zsk => 768 },
         inactive   => { ksk => '1y', zsk => '5w' },
         delete     => { ksk => '10w', zsk => '10w' },
-        prepublish => { ksk => '3w', zsk => '5w' },
+        prepublish => { ksk => '5w', zsk => '5w' },
         keydir     => 'keys',
         keydb      => 'dnskey.db',
         view       => '',
         serialfmt  => 'keep',
     );
+    $config{zonefile} = "$config{zone}.db";
 
     if ( open( FILE, '<', $opts{c} ) ) {
         while (<FILE>) {
