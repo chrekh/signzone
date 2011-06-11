@@ -9,16 +9,13 @@ use Pod::Usage;
 $ENV{PATH} = '/usr/sbin:/usr/bin';
 
 Getopt::Long::Configure( 'bundling', 'no_auto_abbrev' );
-our %opts = ( c => '/etc/bind/signzone.conf' );
+my %opts = ( c => '/etc/bind/signzone.conf' );
 GetOptions( \%opts, 'c=s', 's', 'n', 'r', 'printconf' ) || pod2usage;
 
 {    # main (kind of)
     our %config;
     &readconfig;
-    if ( exists $opts{printconf} ) {
-        &printconf;
-        exit;
-    }
+    &printconf if ( exists $opts{printconf} );
 
     my $now = time;    # To avoid calling time several times, silly, I know. ;)
 
@@ -273,8 +270,6 @@ sub date {
 }
 
 sub readconfig {
-    our %opts;
-
     # Defaults ( and also valid configuration )
     our %config = (
         zone       => 'foo.org',
@@ -361,6 +356,7 @@ sub printconf {
             say "$key = $config{$key}";
         }
     }
+    exit 0;
 }
 
 sub increment_serial {
