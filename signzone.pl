@@ -395,3 +395,150 @@ sub increment_serial {
 
     close F;
 }
+
+=head1 NAME
+
+B<signzone> - A dnssec key management tool
+
+=head1 SYNOPSIS
+
+B<signzone>
+S<[ B<-c> I<configfile> ]>
+S<[ B<-s> ]>
+S<[ B<-r> ]>
+S<[ B<-n> ]>
+S<[ B<--printconf> ]>
+
+=head1 OPTIONS
+
+=over
+
+=item B<-c> I<configfile>
+
+Use I<configfile> as configurationfile instead of default which is
+F</etc/bind/signzone.conf>
+
+=item B<-s>
+
+Sign the zone (if needed), using dnssec-signzone
+
+=item B<-r>
+
+Reload the zone (if signed), using rndc
+
+=item B<-n>
+
+noaction
+
+=item B<--printconf>
+
+Print the active configuration values.
+
+=back
+
+=head1 DESCRIPTION
+
+B<signzone> is a wrapper tool around dnssec tools from bind, that
+manages the keys used to sign a zone.  The keys active state, and
+lifetime as specified to dnssec-keygen is respected, and new keys are
+created when needed, using timing values specified in the
+configuration file.
+
+=head2 configfile syntax
+
+Lines beginning with # is ignored, and can be used for comments.
+
+The values for B<keydb>, B<keydir> and B<zonefile> is relative to
+B<dbdir> unless specified as absolute.
+
+All configuration variables have default values.
+
+Time vaulues is specified as E<lt>integerE<gt>(d,w,m,y), where d is
+for days, w is for weeks, m is for months, and y is for years. If no
+letter is specified, the value is in seconds.
+
+=over
+
+=item B<zone> = I<zone>
+
+Which dns zone to manage keys for.
+
+=item B<dbdir> = I<dir>
+
+Main zone database directory, Default is F</var/named>.
+
+=item B<keydir> = I<dir>
+
+Directoy to look for, and store, keyfiles in. Default is F<dnskey.db>.
+
+=item B<keydb> = I<file>
+
+File to write include-statements for the keys to use in. This file
+should the be included from the zone-file. Default is F<dnskey.db>.
+
+=item B<zonefile> = I<file>
+
+The (unsigned) zonefile for the zone. Default is F<B<zone>.db>
+
+=item B<keysize ksk> = I<nr>
+
+The keysize to use when generating new ksk (key-signing-key). Default is 2048
+
+=item B<keysize zsk> = I<nr>
+
+The keysize to use when generating new zsk (zone-signing-key). Default is 768
+
+=item B<inactive ksk> = I<time>
+
+How long time, since activation, a ksk is active (used to sign the
+zone). Default is 1y.
+
+=item B<inactive zsk> = I<time>
+
+How long time (since activation) a zsk is active (used to sign the
+zone). Default is 5w.
+
+=item B<delete ksk> = I<time>
+
+How long time, after marked inactive, a ksk is to be deleted. Default
+is 10w.
+
+=item B<delete zsk> = I<time>
+
+How long time, after marked inactive, a zsk is to be deleted. Default
+is 10w.
+
+=item B<prepublish ksk> = I<time>
+
+How long time, before activation, a ksk is published, (and created if
+not created by other tool). Default is 5w.
+
+=item B<prepublish zsk> = I<time>
+
+How long time, before activation, a zsk is published, (and created if
+not created by other tool). Default is 5w.
+
+=item B<randomdev> = I<file>
+
+Which randomdev to use when creating keys. Default is F</dev/urandom>.
+
+=item B<serialfmt> = I<keep|increment|unixtime>
+
+Determine if and how serial should be updated in the zonefile if
+option B<-s> is used. I<keep> = do nothing. I<increment> = increment
+integer by one, and I<unixtime> = use current systemtime (seconds
+since 1970-01-01 00:00:00 GMT)
+
+=item B<view> = I<view>
+
+The bind view the zone is in. Only needed for rndc if
+using option B<-r>. Default is no view.
+
+=back
+
+=head1 SEE ALSO
+
+L<dnssec-keygen(8)|dnssec-keygen>,
+L<dnssec-signzone(8)|dnssec-signzone>
+
+=cut
