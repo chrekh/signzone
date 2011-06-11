@@ -162,8 +162,8 @@ GetOptions( \%opts, 'c=s', 's', 'n', 'r', 'printconf' ) || pod2usage;
 sub listkeys {
     our %config;
     my @result;
-    opendir( DIR, $config{keydir} ) || die "opendir $config{keydir} failed: $!";
-    while ( readdir(DIR) ) {
+    opendir( KEYDIR, $config{keydir} ) || die "opendir $config{keydir} failed: $!";
+    while ( readdir(KEYDIR) ) {
         next unless ( -f "$config{keydir}/$_" );
         if ( my ($name) = /^(K$config{zone}\.\+\d+\+\d+)\.key/ ) {
             my $key = { name => $name };
@@ -171,7 +171,7 @@ sub listkeys {
             push( @result, $key );
         }
     }
-    closedir(DIR);
+    closedir KEYDIR;
     return @result;
 }
 
@@ -193,8 +193,8 @@ sub keyinfo {
     die unless $? == 0;
 
     # Get more info by parsing the keydb
-    open( FILE, '<', "$config{keydir}/$key->{name}.key" ) || die "open $key->{name}.key failed: $!";
-    while (<FILE>) {
+    open( KEYFILE, '<', "$config{keydir}/$key->{name}.key" ) || die "open $key->{name}.key failed: $!";
+    while (<KEYFILE>) {
         chomp;
         next if /^;/;    # skip comments
         if ( my ( $zone, $flags, $type, $algo ) = /^(\S+)\s+IN\s+DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s/ )
@@ -204,7 +204,7 @@ sub keyinfo {
             $key->{type}   = ( $flags & 01 ) == 01 ? 'ksk' : 'zsk';    # Bit 15 RFC4034/RFC3757
         }
     }
-    close FILE;
+    close KEYFILE;
 }
 
 sub makekey {
@@ -237,7 +237,7 @@ sub makekey {
     open( CMD, '-|', @cmd ) || die;
     $_ = <CMD>;
     say;
-    close(CMD);
+    close CMD;
     die unless $? == 0;
     chomp;
 
@@ -286,8 +286,8 @@ sub readconfig {
     );
     $config{zonefile} = "$config{zone}.db";
 
-    if ( open( FILE, '<', $opts{c} ) ) {
-        while (<FILE>) {
+    if ( open( CONFIG, '<', $opts{c} ) ) {
+        while (<CONFIG>) {
             chomp;
             next if (/^\s*$/);
             next if (/^#/);
@@ -310,7 +310,7 @@ sub readconfig {
             }
             die "parse error in $opts{c} line $.\n";
         }
-        close FILE;
+        close CONFIG;
     }
     else {
         warn "open $opts{c} failed: $!";
@@ -363,9 +363,9 @@ sub increment_serial {
     our %config;
     return if ( $config{serialfmt} eq 'keep' );
 
-    open( F, '<', $config{zonefile} ) || die "open $config{zonefile} failed: $!";
-    my @zone = <F>;
-    close F;
+    open( ZONEFILE, '<', $config{zonefile} ) || die "open $config{zonefile} failed: $!";
+    my @zone = <ZONEFILE>;
+    close ZONEFILE;
 
     my $changed = 0;
     for (@zone) {
@@ -384,11 +384,11 @@ sub increment_serial {
     }
     return unless $changed;
 
-    open( F, '>', $config{zonefile} ) || die "open $config{zonefile} failed: $!";
+    open( ZONEFILE, '>', $config{zonefile} ) || die "open $config{zonefile} failed: $!";
 
-    print F @zone;
+    print ZONEFILE @zone;
 
-    close F;
+    close ZONEFILE;
 }
 
 =head1 NAME
