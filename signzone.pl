@@ -23,9 +23,9 @@ GetOptions( \%opts, 'c=s', 's', 'n', 'r', 'printconf' ) || pod2usage;
     my %active  = ( ksk => [], zsk => [] );
     my %publish = ( ksk => [], zsk => [] );
     for my $key (&listkeys) {
-        unless ( $key->{zk} ) {
 
-            # Skip keys that are not zone-keys
+        # Skip keys that are not zone-keys
+        unless ( $key->{zk} ) {
             warn "$key->{name} is not a zone-key";
             next;
         }
