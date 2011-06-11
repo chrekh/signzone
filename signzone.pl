@@ -192,16 +192,16 @@ sub keyinfo {
     close CMD;
     die unless $? == 0;
 
-    # Get more info by parsing the keydb
+    # Get more info by parsing the keyfile
     open( KEYFILE, '<', "$config{keydir}/$key->{name}.key" ) || die "open $key->{name}.key failed: $!";
     while (<KEYFILE>) {
         chomp;
         next if /^;/;    # skip comments
-        if ( my ( $zone, $flags, $type, $algo ) = /^(\S+)\s+IN\s+DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s/ )
-        {
-            $key->{zk}     = ( $flags & 0400 ) == 0400;                # Bit 7  RFC4034
-            $key->{revoke} = ( $flags & 0200 ) == 0200;                # Bit 8  RFC5011
-            $key->{type}   = ( $flags & 01 ) == 01 ? 'ksk' : 'zsk';    # Bit 15 RFC4034/RFC3757
+        if ( my ( $zone, $flags, $type, $algo ) =
+                 /^(\S+)\s+IN\s+DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s/ ) {
+            $key->{zk}     = $flags & 0400;                # Bit 7  RFC4034
+            $key->{revoke} = $flags & 0200;                # Bit 8  RFC5011
+            $key->{type}   = $flags & 01 ? 'ksk' : 'zsk';  # Bit 15 RFC4034/RFC3757
         }
     }
     close KEYFILE;
