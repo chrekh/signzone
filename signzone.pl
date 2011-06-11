@@ -4,7 +4,6 @@ use 5.010;
 
 use Getopt::Long;
 use Pod::Usage;
-use File::Copy;
 
 # Hardcoded path
 $ENV{PATH} = '/usr/sbin:/usr/bin';
