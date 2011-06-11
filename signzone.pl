@@ -281,6 +281,7 @@ sub readconfig {
         prepublish => { ksk => '5w',  zsk => '5w' },
         keydir     => 'keys',
         keydb      => 'dnskey.db',
+        zonefile   => undef,
         view       => '',
         serialfmt  => 'keep',
     );
@@ -315,7 +316,7 @@ sub readconfig {
         warn "open $opts{c} failed: $!";
         warn "*** using default configuration ***\n";
     }
-    $config{zonefile} = "$config{zone}.db" unless ( exists $config{zonefile} );
+    $config{zonefile} = "$config{zone}.db" unless ( defined $config{zonefile} );
 
     # Prepend dbdir to relative paths
     for (qw<keydir keydb zonefile>) {
