@@ -276,7 +276,7 @@ sub readconfig {
         delete     => { ksk => '10w', zsk => '10w' },
         prepublish => { ksk => '5w',  zsk => '5w' },
         keydir     => 'keys',
-        keydb      => 'dnskey.db',
+        keydb      => undef,
         zonefile   => undef,
         view       => '',
         serialfmt  => 'keep',
@@ -312,6 +312,7 @@ sub readconfig {
         warn "open $opts{c} failed: $!";
         warn "*** using default configuration ***\n";
     }
+    $config{keydb} = "$config{zone}-dnskey.db" unless ( defined $config{keydb} );
     $config{zonefile} = "$config{zone}.db" unless ( defined $config{zonefile} );
 
     # Prepend dbdir to relative paths
@@ -438,7 +439,7 @@ configuration file.
 
 Lines beginning with # is ignored, and can be used for comments.
 
-The values for B<keydb>, B<keydir> and B<zonefile> is relative to
+The values for B<keydir>, B<keydb> and B<zonefile> is relative to
 B<dbdir> unless specified as absolute.
 
 All configuration variables have default values.
@@ -459,16 +460,16 @@ Main zone database directory, Default is F</var/named>.
 
 =item B<keydir> = I<dir>
 
-Directoy to look for, and store, keyfiles in. Default is F<dnskey.db>.
+Directoy to look for, and store, keyfiles in. Default is F<keys>.
 
 =item B<keydb> = I<file>
 
 File to write include-statements for the keys to use in. This file
-should the be included from the zone-file. Default is F<dnskey.db>.
+should the be included from the zone-file. Default is F<B<E<lt>zoneE<gt>>-dnskey.db>.
 
 =item B<zonefile> = I<file>
 
-The (unsigned) zonefile for the zone. Default is F<B<zone>.db>
+The (unsigned) zonefile for the zone. Default is F<B<E<lt>zoneE<gt>>.db>
 
 =item B<keysize ksk> = I<nr>
 
