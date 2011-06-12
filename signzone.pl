@@ -100,10 +100,7 @@ GetOptions( \%opts, 'c=s', 's', 'n', 'r', 'printconf' ) || pod2usage;
         close KEYFILE;
         for my $type (qw<ksk zsk>) {
             for ( @{ $active{$type} }, @{ $publish{$type} } ) {
-                if ( exists $keys{ $_->{name} } ) {
-                    delete $keys{ $_->{name} };
-                }
-                else {
+                unless ( delete $keys{ $_->{name} } ) {
                     $newkeydb = 1;
                     last;
                 }
@@ -256,8 +253,7 @@ sub mktime {
     for (@_) {
         my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) = gmtime($_);
 
-        # YYYYMMDDHHMMSS
-        push @result,
+        push @result, # YYYYMMDDHHMMSS
             sprintf( "%04d%02d%02d%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec );
     }
     return @result;
