@@ -312,8 +312,8 @@ sub readconfig {
         warn "open $opts{c} failed: $!";
         warn "*** using default configuration ***\n";
     }
-    $config{keydb} = "$config{zone}-dnskey.db" unless ( defined $config{keydb} );
-    $config{zonefile} = "$config{zone}.db"     unless ( defined $config{zonefile} );
+    $config{keydb}    = "$config{zone}-dnskey.db" unless ( defined $config{keydb} );
+    $config{zonefile} = "$config{zone}.db"        unless ( defined $config{zonefile} );
 
     # Prepend dbdir to relative paths
     for (qw<keydir keydb zonefile>) {
