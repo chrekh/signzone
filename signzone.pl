@@ -324,9 +324,7 @@ sub readconfig {
     }
 
     # convert times to seconds
-    my $min  = 60;
-    my $hour = 60 * $min;
-    my $day  = 24 * $hour;
+    my $day  = 60 * 60 * 24;
     my $week = 7 * $day;
     my $mon  = 30 * $day;
     my $year = 365 * $day;
