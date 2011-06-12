@@ -365,17 +365,15 @@ sub increment_serial {
 
     my $changed = 0;
     for (@zone) {
-        if ( $config{serialfmt} eq 'increment' ) {
-            if (s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,$2+1)/e) {
-                $changed = 1;
-                last;
-            }
+        if ( $config{serialfmt} eq 'increment'
+                 && s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,$2+1)/e ) {
+            $changed = 1;
+            last;
         }
-        elsif ( $config{serialfmt} eq 'unixtime' ) {
-            if (s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,time)/e) {
-                $changed = 1;
-                last;
-            }
+        if ( $config{serialfmt} eq 'unixtime'
+                 && s/^(\s*)(\d+)\s+;\s+serial$/sprintf("%s%-11d; serial",$1,time)/e ) {
+            $changed = 1;
+            last;
         }
     }
     return unless $changed;
