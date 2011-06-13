@@ -115,17 +115,17 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
     if (!exists $opts{n} && $newkeydb) {
         open(KEYFILE, '>', $config{keydb}) || die "open $config{keydb} failed: $!";
     }
-    say "  Key                           type publish  activate inactivate";
+    say "  Key                           type        active          delete";
     for my $type (qw<ksk zsk>) {
         for my $key (sort { $a->{Activate} <=> $b->{Activate} }
                          (@{ $active{$type} }, @{ $publish{$type} })) {
             my $is_active = $now >= $key->{Activate} && $now <= $key->{Inactive} ? '* ' : '  ';
             printf(
-                "%s%-30s %s %s %s %s\n",
+                "%s%-30s %s %s -> %s   %s\n",
                 $is_active, $key->{name}, $key->{type},
-                &date($key->{Publish}),
                 &date($key->{Activate}),
                 &date($key->{Inactive}),
+                &date($key->{Delete}),
             );
             if (!exists $opts{n} && $newkeydb) {
                 print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
