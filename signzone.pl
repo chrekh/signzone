@@ -129,13 +129,17 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
     if (!exists $opts{n} && $newkeydb) {
         open(KEYFILE, '>', $config{keydb}) || die "open $config{keydb} failed: $!";
     }
-    say "  Key                           type        active          delete";
+
+    # length for printf. Since all keys are for the same zone the
+    # length is equal, so just use the length of the first zsk.
+    my $keynamelength = length($publish{zsk}[0]->{name});
+    printf("  %-${keynamelength}s  type        active          delete\n",'Key');;
     for my $type (qw<ksk zsk>) {
         for my $key (sort { $a->{Activate} <=> $b->{Activate} }
                          (@{ $active{$type} }, @{ $publish{$type} })) {
             my $is_active = $now >= $key->{Activate} && $now <= $key->{Inactive} ? '* ' : '  ';
             printf(
-                "%s%-30s %s %s -> %s   %s\n",
+                "%s%-${keynamelength}s  %s %s -> %s   %s\n",
                 $is_active, $key->{name}, $key->{type},
                 &date($key->{Activate}),
                 &date($key->{Inactive}),
