@@ -30,9 +30,9 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
             next;
         }
 
-        # Fix key if delete-date is before inactivation-time + config{delete}
-        if ( $key->{Delete} < $key->{Inactive} + $config{delete}{$key->{type}} ) {
-            warn "$key->{name}: delete-time is before delete-time according to configfile.\n";
+        # Fix key if delete-date is before inactivation
+        if ( $key->{Delete} < $key->{Inactive} ) {
+            warn "$key->{name}: delete-time is before inactivation.\n";
             warn "fixing it...\n";
             my $deltime = $key->{Inactive} + $config{delete}{$key->{type}};
             my @cmd = ('dnssec-settime', '-D', &mktime($deltime), "$config{keydir}/$key->{name}");
