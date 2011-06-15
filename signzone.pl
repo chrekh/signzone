@@ -17,6 +17,8 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
     &readconfig;
     &printconf if (exists $opts{printconf});
 
+    chdir $config{dbdir} || die "chdir $config{dbdir} failed: $!";
+
     my $now = time;    # To avoid calling time several times, silly, I know. ;)
 
     # Put keys in separate lists
