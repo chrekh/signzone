@@ -46,8 +46,8 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
             $key->{Delete} = $deltime;
         }
 
-        # Delete keys that should be deleted
-        if (exists $key->{Delete} && $now > $key->{Delete}) {
+        # Remove keys that should be removed
+        if (exists $key->{Delete} && $now > $key->{Delete} + $config{remove}) {
             say "rm $key->{name}";
             unless (exists $opts{n}) {
                 unlink "$config{keydir}/$key->{name}.key";
@@ -306,7 +306,8 @@ sub readconfig {
         randomdev  => '/dev/urandom',
         keysize    => { ksk => 2048,  zsk => 768 },
         inactive   => { ksk => '1y',  zsk => '5w' },
-        delete     => { ksk => '10w', zsk => '10w' },
+        delete     => { ksk => '2w',  zsk => '2w' },
+        remove     => { ksk => '10w', zsk => '10w' },
         prepublish => { ksk => '5w',  zsk => '5w' },
         keydir     => 'keys',
         keydb      => undef,
@@ -522,23 +523,33 @@ zone). Default is 5w.
 
 =item B<delete ksk> = I<time>
 
-How long time, after marked inactive, a ksk is to be deleted. Default
-is 10w.
+How long time, after marked inactive, a zsk is to be deleted (from the
+zone, the keyfile is not deleted). Default is 2w.
 
 =item B<delete zsk> = I<time>
 
-How long time, after marked inactive, a zsk is to be deleted. Default
-is 10w.
+How long time, after marked inactive, a zsk is to be deleted (from the
+zone, the keyfile is not deleted). Default is 2w.
+
+=item B<remove ksk> = I<time>
+
+How long after the ksk is deleted from the zone, until the keyfile is
+removed from disk. Default is 10w
+
+=item B<remove zsk> = I<time>
+
+How long after the zsk is deleted from the zone, until the keyfile is
+removed from disk. Default is 10w
 
 =item B<prepublish ksk> = I<time>
 
 How long time, before activation, a ksk is published, (and created if
-not created by other tool). Default is 5w.
+not created by other tool). Default is 6w.
 
 =item B<prepublish zsk> = I<time>
 
 How long time, before activation, a zsk is published, (and created if
-not created by other tool). Default is 5w.
+not created by other tool). Default is 6w.
 
 =item B<randomdev> = I<file>
 
