@@ -131,8 +131,8 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
     }
 
     # length for printf. Since all keys are for the same zone the
-    # length is equal, so just use the length of the first zsk.
-    my $keynamelength = length($publish{zsk}[0]->{name});
+    # length is equal, so just use the length of the first active ksk.
+    my $keynamelength = length($active{ksk}[0]->{name});
     printf("  %-${keynamelength}s  type        active          delete\n",'Key');;
     for my $type (qw<ksk zsk>) {
         for my $key (sort { $a->{Activate} <=> $b->{Activate} }
