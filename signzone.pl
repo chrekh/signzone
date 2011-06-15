@@ -130,7 +130,7 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
                 }
             }
         }
-        $do_sign = 1 unless (keys %{$keys{active}} == 0 && %{$keys{publish}} == 0);
+        $do_sign = 1 unless (keys %{$keys{active}} == 0 && keys %{$keys{publish}} == 0);
     }
     else {
         $do_sign = 1;
