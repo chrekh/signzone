@@ -100,33 +100,44 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
 
     # Compare present keydb with keylist, to be able to tell if we
     # should write a new keydb
-    my $newkeydb = 0;
+    my $do_sign = 0;
     if (open(KEYFILE, '<', $config{keydb})) {
         my %keys;
         while (<KEYFILE>) {
             chomp;
-            if (my ($keyname) = /include.+(K$config{zone}\.+\S+)\.key/) {
-                $keys{$keyname} = 1;
+            if (my ($keyname,$active) = /include.+(K$config{zone}\.+\S+)\.key\s*;\s*[kz]sk\s*(\*?)/) {
+                if ( $active ) {
+                    $keys{active}{$keyname} = 1;
+                }
+                else {
+                    $keys{publish}{$keyname} = 1;
+                }                    
                 next;
             }
         }
         close KEYFILE;
         for my $type (qw<ksk zsk>) {
-            for (@{ $active{$type} }, @{ $publish{$type} }) {
-                unless (delete $keys{ $_->{name} }) {
-                    $newkeydb = 1;
+            for (@{ $active{$type} }) {
+                unless (delete $keys{active}{ $_->{name} }) {
+                    $do_sign = 1;
+                    last;
+                }
+            }
+            for (@{ $publish{$type} }) {
+                unless (delete $keys{publish}{ $_->{name} }) {
+                    $do_sign = 1;
                     last;
                 }
             }
         }
-        $newkeydb = 1 unless (keys %keys == 0);
+        $do_sign = 1 unless (keys %{$keys{active}} == 0 && %{$keys{publish}} == 0);
     }
     else {
-        $newkeydb = 1;
+        $do_sign = 1;
     }
 
     # Write active and published keys to the keydb to be included in the zone.
-    if (!exists $opts{n} && $newkeydb) {
+    if (!exists $opts{n} && $do_sign) {
         open(KEYFILE, '>', $config{keydb}) || die "open $config{keydb} failed: $!";
     }
 
@@ -137,22 +148,23 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
     for my $type (qw<ksk zsk>) {
         for my $key (sort { $a->{Activate} <=> $b->{Activate} }
                          (@{ $active{$type} }, @{ $publish{$type} })) {
-            my $is_active = $now >= $key->{Activate} && $now <= $key->{Inactive} ? '* ' : '  ';
+            my $is_active = $now >= $key->{Activate} && $now <= $key->{Inactive} ? '*' : '';
             printf(
-                "%s%-${keynamelength}s  %s %s -> %s   %s\n",
+                "%-2s%-${keynamelength}s  %s %s -> %s   %s\n",
                 $is_active, $key->{name}, $key->{type},
                 &date($key->{Activate}),
                 &date($key->{Inactive}),
                 &date($key->{Delete}),
             );
-            if (!exists $opts{n} && $newkeydb) {
-                print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type}\n";
+            if (!exists $opts{n} && $do_sign) {
+                print KEYFILE '$include ', "$config{keydir}/$key->{name}.key ; $key->{type} $is_active\n"
             }
         }
     }
-    close KEYFILE if (!exists $opts{n} && $newkeydb);
+    close KEYFILE if (!exists $opts{n} && $do_sign);
 
-    if ($newkeydb && exists $opts{s}) {
+    if ($do_sign && exists $opts{s}) {
+        say "increment serial";
         &increment_serial unless (exists $opts{n});
         my @cmd = ('dnssec-signzone', '-S', '-K', $config{keydir}, '-o', $config{zone});
         push @cmd, $config{zonefile};
