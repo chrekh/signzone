@@ -10,7 +10,7 @@ $ENV{PATH} = '/usr/sbin:/usr/bin';
 
 Getopt::Long::Configure('bundling', 'no_auto_abbrev');
 my %opts = (c => '/etc/bind/signzone.conf');
-GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
+GetOptions(\%opts, 'c=s', 'n', 's', 'f', 'r', 'printconf') || pod2usage;
 
 {    # main (kind of)
     our %config;
@@ -103,7 +103,7 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
     # Compare present keydb with keylist, to be able to tell if we
     # should write a new keydb
     my $do_sign = 0;
-    if (open(KEYFILE, '<', $config{keydb})) {
+    if (! exists $opts{f} && open(KEYFILE, '<', $config{keydb})) {
         my %keys;
         while (<KEYFILE>) {
             chomp;
@@ -165,7 +165,7 @@ GetOptions(\%opts, 'c=s', 's', 'n', 'r', 'printconf') || pod2usage;
     }
     close KEYFILE if (!exists $opts{n} && $do_sign);
 
-    if ($do_sign && exists $opts{s}) {
+    if (exists $opts{s} && ($do_sign || exists $opts{f} )) {
         say "increment serial";
         &increment_serial unless (exists $opts{n});
         my @cmd = ('dnssec-signzone', '-S', '-K', $config{keydir}, '-o', $config{zone});
@@ -308,7 +308,7 @@ sub readconfig {
         inactive   => { ksk => '1y',  zsk => '5w' },
         delete     => { ksk => '2w',  zsk => '2w' },
         remove     => { ksk => '10w', zsk => '10w' },
-        prepublish => { ksk => '5w',  zsk => '5w' },
+        prepublish => { ksk => '6w',  zsk => '6w' },
         keydir     => 'keys',
         keydb      => undef,
         zonefile   => undef,
@@ -429,6 +429,7 @@ B<signzone>
 S<[ B<-c> I<configfile> ]>
 S<[ B<-s> ]>
 S<[ B<-r> ]>
+S<[ B<-f> ]>
 S<[ B<-n> ]>
 S<[ B<--printconf> ]>
 
@@ -448,6 +449,10 @@ Sign the zone (if needed), using dnssec-signzone
 =item B<-r>
 
 Reload the zone (if signed), using rndc
+
+=item B<-f>
+
+force signing if B<-s>, and reload if B<-r> even if nothing has changed.
 
 =item B<-n>
 
