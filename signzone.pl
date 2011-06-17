@@ -46,12 +46,16 @@ GetOptions(\%opts, 'c=s', 'n', 's', 'f', 'r', 'printconf') || pod2usage;
             $key->{Delete} = $deltime;
         }
 
-        # Remove keys that should be removed
-        if (exists $key->{Delete} && $now > $key->{Delete} + $config{remove}) {
-            say "rm $key->{name}";
-            unless (exists $opts{n}) {
-                unlink "$config{keydir}/$key->{name}.key";
-                unlink "$config{keydir}/$key->{name}.private";
+        # Skip keys that are deleted (from zone)
+        if (exists $key->{Delete} && $now > $key->{Delete} ) {
+
+            # And delete the keyfile if that time has arrived.
+            if ( $now > $key->{Delete} + $config{remove}) {
+                say "rm $key->{name}";
+                unless (exists $opts{n}) {
+                    unlink "$config{keydir}/$key->{name}.key";
+                    unlink "$config{keydir}/$key->{name}.private";
+                }
             }
             next;
         }
