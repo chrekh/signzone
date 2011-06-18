@@ -170,6 +170,9 @@ GetOptions(\%opts, 'c=s', 'n', 's', 'f', 'r', 'printconf') || pod2usage;
     }
     close KEYFILE if (!exists $opts{n} && $do_sign);
 
+    # Also, we must sign the zone if the rrsig are about to expire
+    $do_sign = &get_rrsig_exptime < mktime($now + 60 * 60 * 45);
+
     if (exists $opts{s} && ($do_sign || exists $opts{f} )) {
         say "increment serial";
         &increment_serial unless (exists $opts{n});
@@ -286,14 +289,9 @@ sub makekey {
 }
 
 sub mktime {
-    my @result;
-    for (@_) {
-        my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = gmtime($_);
-
-        push @result,    # YYYYMMDDHHMMSS
-            sprintf("%04d%02d%02d%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
-    }
-    return @result;
+    my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = gmtime(shift);
+    # YYYYMMDDHHMMSS
+    return sprintf("%04d%02d%02d%02d%02d%02d", $year + 1900, $mon + 1, $mday, $hour, $min, $sec);
 }
 
 sub date {
@@ -392,6 +390,26 @@ sub printconf {
         }
     }
     exit 0;
+}
+
+sub get_rrsig_exptime {
+    our %config;
+    my $file = "$config{zonefile}.signed";
+    open(ZONEFILE,'<',$file) || die "open $file failed: $!";
+    my $result;
+    while (<ZONEFILE>) {
+        chomp;
+        # find the lowest value for RRSIG expiretime
+        if ( my ($exptime) = /RRSIG\s+\S+\s+\d+\s+\d+\s+\d+\s+(\d+)\s+/ ) {
+            unless ( defined $result ) {
+                $result = $exptime;
+                next;
+            }
+            $result = $exptime if ( $exptime < $result );
+        }
+    }
+    close ZONEFILE;
+    return $result;
 }
 
 sub increment_serial {
