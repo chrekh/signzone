@@ -170,8 +170,8 @@ GetOptions(\%opts, 'c=s', 'n', 's', 'f', 'r', 'printconf') || pod2usage;
     }
     close KEYFILE if (!exists $opts{n} && $do_sign);
 
-    # Also, we must sign the zone if the rrsig are about to expire
-    $do_sign = &get_rrsig_exptime < mktime($now + 60 * 60 * 45);
+    # Also, we must sign the zone if the rrsigs are about to expire
+    $do_sign = 1 if &get_rrsig_exptime < mktime($now + 60 * 60 * 48);
 
     if (exists $opts{s} && ($do_sign || exists $opts{f} )) {
         say "increment serial";
