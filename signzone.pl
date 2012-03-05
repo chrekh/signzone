@@ -399,13 +399,36 @@ sub get_rrsig_exptime {
     my $result;
     while (<ZONEFILE>) {
         chomp;
+        # Find which bind-version used to write the file.
+        state ($v1,$v2);
+        if ( /dnssec_signzone\s+version\s+(\d+)\.(\d+)/ ) {
+            $v1 = $1;
+            $v2 = $2;
+        }
+        next unless ( defined $v1 );
+        
         # find the lowest value for RRSIG expiretime
-        if ( my ($exptime) = /RRSIG\s+\S+\s+\d+\s+\d+\s+\d+\s+(\d+)\s+/ ) {
-            unless ( defined $result ) {
-                $result = $exptime;
-                next;
+        if ($v1 <= 9 && $v2 < 9 ) {
+            # Bind v9.8
+            if ( my ($exptime) = /RRSIG\s+\S+\s+\d+\s+\d+\s+\d+\s+(\d+)\s+/ ) {
+                unless ( defined $result ) {
+                    $result = $exptime;
+                    next;
+                }
+                $result = $exptime if ( $exptime < $result );
             }
-            $result = $exptime if ( $exptime < $result );
+        }
+        else {
+            # Newer than v9.8
+            if ( /RRSIG\s+\S+\s+\d+\s+\d+\s+\d+\s+\($/ ){
+                $_ = <ZONEFILE>;
+                my ($exptime) = /^\s+(\d+)/;
+                unless ( defined $result ) {
+                    $result = $exptime;
+                    next;
+                }
+                $result = $exptime if ( $exptime < $result );
+            }
         }
     }
     close ZONEFILE;
