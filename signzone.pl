@@ -395,6 +395,10 @@ sub printconf {
 sub get_rrsig_exptime {
     our %config;
     my $file = "$config{zonefile}.signed";
+
+    # If the file don't exist the zone is never signed
+    return 0 unless ( -f $file );
+
     open(ZONEFILE,'<',$file) || die "open $file failed: $!";
     my $result;
     while (<ZONEFILE>) {
