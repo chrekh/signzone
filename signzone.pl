@@ -174,7 +174,6 @@ GetOptions(\%opts, 'c=s', 'n', 's', 'f', 'r', 'printconf') || pod2usage;
     $do_sign = 1 if &get_rrsig_exptime < mktime($now + 60 * 60 * 48);
 
     if (exists $opts{s} && ($do_sign || exists $opts{f} )) {
-        say "increment serial";
         &increment_serial unless (exists $opts{n});
         my @cmd = ('dnssec-signzone', '-S', '-K', $config{keydir}, '-o', $config{zone});
         push @cmd, $config{zonefile};
@@ -442,6 +441,7 @@ sub get_rrsig_exptime {
 sub increment_serial {
     our %config;
     return if ($config{serialfmt} eq 'keep');
+    say "increment serial";
 
     open(ZONEFILE, '<', $config{zonefile}) || die "open $config{zonefile} failed: $!";
     my @zone = <ZONEFILE>;
