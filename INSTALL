@@ -1,0 +1,26 @@
+1) Obtain the source, and install the program, and the man-page
+
+ git clone git://github.com/chrekh/signzone
+ cd signzone
+ make install
+
+That installs signzone under /usr/local using /bin/perl. You can also
+specify different destination, and different perl.
+
+ make PERL=/some/other/bin/perl INST=/some/other/prefix
+
+2) Read the fine manual
+
+ man signzone
+ 
+3) Edit your configfile for signzone
+
+ vi /etc/bind/signzone.conf
+
+The absolute minimal configuration needed is zone.
+
+4) Run signzone (as the user owning the zonefiles)
+
+ sudo -u named /usr/local/bin/signzone -sr
+
+5 Add cronjob to run signzone daily.
