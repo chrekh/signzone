@@ -117,7 +117,7 @@ GetOptions(\%opts, 'c=s', 'n', 's', 'f', 'r', 'printconf') || pod2usage;
                 }
                 else {
                     $keys{publish}{$keyname} = 1;
-                }                    
+                }
                 next;
             }
         }
@@ -409,7 +409,7 @@ sub get_rrsig_exptime {
             $v2 = $2;
         }
         next unless ( defined $v1 );
-        
+
         # find the lowest value for RRSIG expiretime
         if ($v1 <= 9 && $v2 < 9 ) {
             # Bind v9.8
