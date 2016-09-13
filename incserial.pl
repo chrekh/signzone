@@ -83,7 +83,7 @@ S<zonefile>
 
 =item B<--serialfmt> I<keep|increment|unixtime|datestr>
 
-Type of serial to generate.
+Type of serial to generate. Default is increment.
 
 =back
 
