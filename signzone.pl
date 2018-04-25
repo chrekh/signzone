@@ -248,7 +248,7 @@ sub makekey {
     our %config;
     my @cmd = (
         'dnssec-keygen', '-r', $config{randomdev}, '-b', $config{keysize}{$type},
-        '-K', $config{keydir}
+        '-a', $config{algorithm}, '-K', $config{keydir}
     );
     push @cmd, '-f', 'KSK' if ($type eq 'ksk');
     push @cmd, '-n', 'ZONE', '-P', &mktime($p), '-A', &mktime($a),
@@ -306,7 +306,7 @@ sub readconfig {
         zone       => 'foo.org',
         dbdir      => '/var/named',
         randomdev  => '/dev/urandom',
-        keysize    => { ksk => 2048,  zsk => 768 },
+        keysize    => { ksk => 2048,  zsk => 1024 },
         inactive   => { ksk => '1y',  zsk => '5w' },
         delete     => { ksk => '2w',  zsk => '2w' },
         remove     => { ksk => '10w', zsk => '10w' },
@@ -316,6 +316,7 @@ sub readconfig {
         zonefile   => undef,
         view       => '',
         serialfmt  => 'keep',
+        algorithm  => 'RSASHA1',
     );
 
     if (open(CONFIG, '<', $opts{c})) {
@@ -616,6 +617,11 @@ Determine if and how serial should be updated in the zonefile if
 option B<-s> is used. I<keep> = do nothing. I<increment> = increment
 integer by one, and I<unixtime> = use current systemtime (seconds
 since 1970-01-01 00:00:00 GMT)
+
+=item B<algorithm> = I<algorithm>
+
+Which cryptographic algorithm to use with
+L<dnssec-keygen(8)|dnssec-keygen>. Default is RSASHA1.
 
 =item B<view> = I<view>
 
