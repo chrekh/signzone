@@ -272,9 +272,9 @@ sub makekey {
     my $key;
     open(CMD, '-|', @cmd) || die;
     $_ = <CMD>;
-    say;
     close CMD;
     die unless $? == 0;
+    say;
     chomp;
 
     if (my ($name) = /^(K$config{zone}\.\+\d+\+\d+)$/) {
